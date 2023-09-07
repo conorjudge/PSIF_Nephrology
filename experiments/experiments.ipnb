@@ -1,0 +1,1537 @@
+{
+ "cells": [
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Created By Samuele Buosi on July 2023"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import pickle as pkl\n",
+    "import glob\n",
+    "import csv\n",
+    "import seaborn as sns\n",
+    "import matplotlib.pyplot as plt\n",
+    "from plotly.offline import iplot\n",
+    "\n",
+    "from tqdm import tqdm\n",
+    "\n",
+    "from transformers import TFAutoModel, AutoTokenizer\n",
+    "\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.preprocessing import KBinsDiscretizer\n",
+    "from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_fscore_support\n",
+    "\n",
+    "from transformers import AutoTokenizer, AutoModelForSequenceClassification, DistilBertTokenizer\n",
+    "from transformers import DistilBertTokenizer\n",
+    "from transformers import TFDistilBertForSequenceClassification\n",
+    "from transformers import TextClassificationPipeline"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# tensorflow stuff\n",
+    "import tensorflow as tf\n",
+    "print(tf.__version__)\n",
+    "print(tf.config.experimental.list_physical_devices())\n",
+    "print(tf.test.gpu_device_name())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "##### Dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load dataset\n",
+    "ds1_path = r\"FOLDER\"\n",
+    "ds2_path = r\"FOLDER\"\n",
+    "ds3_path = r\"FOLDER\"\n",
+    "\n",
+    "df1 = pd.read_csv(ds1_path)\n",
+    "df2 = pd.read_csv(ds2_path)\n",
+    "df3 = pd.read_csv(ds3_path)\n",
+    "df = pd.concat([df1, df2, df3], axis=0, ignore_index=True)\n",
+    "\n",
+    "\n",
+    "print(df.loc[[0]])\n",
+    "print(len(df.index))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df['text'][0]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# UNA TANTUM\n",
+    "# csv to txt\n",
+    "txt_output_path = r\"FOLDER\"\n",
+    "i=0\n",
+    "for text in df['text']:\n",
+    "    #print (text)\n",
+    "    file_path=txt_output_path+'\\\\'+str(i)+'.txt'\n",
+    "    df=open(file_path,'w')\n",
+    "    df.write(text)\n",
+    "    df.close()\n",
+    "    i = i + 1\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# TEMP: RUN the textwash command on the CLI\n",
+    "# ~10 mins for 2600 on cpu\n",
+    "#python3 anon.py --input_dir FOLDER --output_dir FOLDER --cpu\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# TODO: fix env to lunch the command from here\n",
+    "#os.chdir(r'FOLDER')\n",
+    "#!python anon.py --input_dir \"FOLDER\" --output_dir \"FOLDER\" --cpu"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import textwash txts to df\n",
+    "\n",
+    "import pandas as pd\n",
+    "import os\n",
+    "import glob\n",
+    "\n",
+    "# Step 1: get a list of all csv files in target directory\n",
+    "my_dir = r\"FOLDER\"\n",
+    "file_extension = \".txt\" \n",
+    "filesList = []\n",
+    "\n",
+    "# Step 2: Build up list of files:\n",
+    "def extract_number(filename):\n",
+    "    return int(filename.split(\".\")[0]) # Extract the number from the filename\n",
+    "\n",
+    "file_list = [file for file in os.listdir(my_dir) if file.endswith(file_extension)]\n",
+    "filesList = sorted(file_list, key=extract_number)\n",
+    "    \n",
+    "# Step 3: Build up DataFrame:\n",
+    "df_ = pd.DataFrame()\n",
+    "for ijk in filesList:\n",
+    "\n",
+    "    with open(my_dir+'\\\\'+ijk, \"r\") as file:\n",
+    "        file_contents = file.read()\n",
+    "        data = {\"text\": [file_contents]}\n",
+    "        df_ = df_.append(data, ignore_index=True)\n",
+    "    \n",
+    "# Step 4: replace text in the original df\n",
+    "df['text'] = df_.replace(df['text'])\n",
+    "\n",
+    "print(df)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "p = df_.iloc[0]['text']\n",
+    "p[0]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(len(df.index))\n",
+    "print(len(df_.index))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(df.iloc[2607][0][0])\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(df_.iloc[2607][0][0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(df.shape)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#df['count'] = df['text'].apply(lambda x: len(x.split())) # no anonymization\n",
+    "df['count'] = df['text'].apply(lambda x: len(x[0].split())) # yes anonymization"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize= (8, 8))\n",
+    "\n",
+    "sns.displot(df['count'])\n",
+    "\n",
+    "plt.xlim(0, 300)\n",
+    "\n",
+    "plt.xlabel('The num of words ', fontsize = 16)\n",
+    "plt.title(\"The Number of Words Distribution\", fontsize = 18)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(df[\"count\"].mean(), df[\"count\"].max())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "diab_count = df['label_diabetes'].value_counts()\n",
+    "diab_classes = diab_count.index\n",
+    "diab_classes"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "diab_count"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig = plt.figure(figsize= (12, 5))\n",
+    "ax = fig.add_subplot(111)\n",
+    "sns.barplot(x = diab_count.index, y = diab_count )\n",
+    "\n",
+    "for a, p in enumerate(ax.patches):\n",
+    "    ax.annotate(f'{diab_count.index[a]}\\n' + format(p.get_height(), '.0f'), xy = (p.get_x() + p.get_width() / 2.0, p.get_height()), xytext = (0,-25), size = 13, color = 'white' , ha = 'center', va = 'center', textcoords = 'offset points', bbox = dict(boxstyle = 'round', facecolor='none',edgecolor='white', alpha = 0.5) )\n",
+    "plt.xlabel('diab_classes', size = 15)\n",
+    "plt.ylabel('The Number of labels per class', size= 15)\n",
+    "plt.xticks(size = 12)\n",
+    "plt.title(\"The number of entries by diab_class\" , size = 18)\n",
+    "\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "hyp_count = df['label_hypertension'].value_counts()\n",
+    "hyp_classes = hyp_count.index\n",
+    "hyp_classes"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "hyp_count"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig = plt.figure(figsize= (12, 5))\n",
+    "ax = fig.add_subplot(111)\n",
+    "sns.barplot(x = hyp_count.index, y = hyp_count )\n",
+    "\n",
+    "for a, p in enumerate(ax.patches):\n",
+    "    ax.annotate(f'{hyp_count.index[a]}\\n' + format(p.get_height(), '.0f'), xy = (p.get_x() + p.get_width() / 2.0, p.get_height()), xytext = (0,-25), size = 13, color = 'white' , ha = 'center', va = 'center', textcoords = 'offset points', bbox = dict(boxstyle = 'round', facecolor='none',edgecolor='white', alpha = 0.5) )\n",
+    "plt.xlabel('hyp_classes', size = 15)\n",
+    "plt.ylabel('The Number of labels per class', size= 15)\n",
+    "plt.xticks(size = 12)\n",
+    "plt.title(\"The number of entries by hyp_class\" , size = 18)\n",
+    "\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "neph_count = df['label_iga_nephropathy'].value_counts()\n",
+    "neph_classes = neph_count.index\n",
+    "neph_classes"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "neph_count"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig = plt.figure(figsize= (12, 5))\n",
+    "ax = fig.add_subplot(111)\n",
+    "sns.barplot(x = neph_count.index, y = neph_count )\n",
+    "\n",
+    "for a, p in enumerate(ax.patches):\n",
+    "    ax.annotate(f'{neph_count.index[a]}\\n' + format(p.get_height(), '.0f'), xy = (p.get_x() + p.get_width() / 2.0, p.get_height()), xytext = (0,-25), size = 13, color = 'white' , ha = 'center', va = 'center', textcoords = 'offset points', bbox = dict(boxstyle = 'round', facecolor='none',edgecolor='white', alpha = 0.5) )\n",
+    "plt.xlabel('neph_classes', size = 15)\n",
+    "plt.ylabel('The Number of labels per class', size= 15)\n",
+    "plt.xticks(size = 12)\n",
+    "plt.title(\"The number of entries by neph_class\" , size = 18)\n",
+    "\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Diabetes cls"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# label encoding\n",
+    "df['label_diabetes'].unique()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df['encoded_diab'] = df['label_diabetes'].astype('category').cat.codes\n",
+    "df.head(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data_texts = df['text'].to_list()\n",
+    "data_labels = df['encoded_diab'].to_list()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Training"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ds splits\n",
+    "train_texts, val_texts, train_labels, val_labels = train_test_split(data_texts, data_labels, test_size = 0.2, random_state = 0 )\n",
+    "\n",
+    "train_texts, test_texts, train_labels, test_labels = train_test_split(train_texts, train_labels, test_size = 0.01, random_state = 0 )\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Model selection\n",
+    "model_name = 'distilbert-base-cased'  \n",
+    "\n",
+    "tokenizer = DistilBertTokenizer.from_pretrained(model_name)\n",
+    "\n",
+    "train_encodings = tokenizer(train_texts, truncation = True, padding = True  )\n",
+    "val_encodings = tokenizer(val_texts, truncation = True, padding = True )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "train_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(train_encodings),\n",
+    "    train_labels\n",
+    "))\n",
+    "\n",
+    "val_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(val_encodings),\n",
+    "    val_labels\n",
+    "))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# model definition\n",
+    "model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-cased', num_labels=3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from transformers import TFDistilBertForSequenceClassification, TFTrainer, TFTrainingArguments\n",
+    "\n",
+    "\n",
+    "training_args = TFTrainingArguments(\n",
+    "    output_dir='./results',          \n",
+    "    num_train_epochs=7,              \n",
+    "    per_device_train_batch_size=8,  \n",
+    "    per_device_eval_batch_size=32,   \n",
+    "    warmup_steps=500,                \n",
+    "    weight_decay=1e-5,               \n",
+    "    logging_dir='./logs',            \n",
+    "    eval_steps=100,\n",
+    "    metric_for_best_model='eval_Loss',\n",
+    "    \n",
+    "    evaluation_strategy=\"epoch\",\n",
+    "    save_strategy=\"epoch\",\n",
+    "    save_total_limit=1,\n",
+    "\n",
+    "    #optim=\"adamw_torch\",\n",
+    "    #learning_rate=5e-5,\n",
+    "    load_best_model_at_end=True,\n",
+    "    #greater_is_better=False,\n",
+    "    disable_tqdm=False                  \n",
+    ")\n",
+    "\n",
+    "with training_args.strategy.scope():\n",
+    "    trainer_model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-cased', num_labels = 3 )\n",
+    "\n",
+    "trainer = TFTrainer(\n",
+    "    model=trainer_model,                 \n",
+    "    args=training_args,                  \n",
+    "    train_dataset=train_dataset,         \n",
+    "    eval_dataset=val_dataset,            \n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trainer.evaluate()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from datasets import load_metric \n",
+    "\n",
+    "metric = load_metric(\"accuracy\")#(\"glue\",\"mrpc\")\n",
+    "\n",
+    "def compute_metrics(eval_preds):\n",
+    "    logits, labels = eval_preds\n",
+    "    predictions = np.argmax(logits, axis=-1)\n",
+    "    return metric.compute(prediction=predictions, references=labels)\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "save_directory = r\"FOLDER\" \n",
+    "\n",
+    "model.save_pretrained(save_directory)\n",
+    "\n",
+    "tokenizer.save_pretrained(save_directory)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load model\n",
+    "tokenizer_fine_tuned = DistilBertTokenizer.from_pretrained(save_directory)\n",
+    "\n",
+    "model_fine_tuned = TFDistilBertForSequenceClassification.from_pretrained(save_directory)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_text = test_texts[0]\n",
+    "\n",
+    "test_text"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0"
+      ]
+     },
+     "execution_count": 52,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "predict_input = tokenizer_fine_tuned.encode(\n",
+    "    test_text,\n",
+    "    truncation = True,\n",
+    "    padding = True,\n",
+    "    return_tensors = 'tf'    \n",
+    ")\n",
+    "\n",
+    "output = model_fine_tuned(predict_input)[0]\n",
+    "\n",
+    "prediction_value = tf.argmax(output, axis = 1).numpy()[0]\n",
+    "\n",
+    "prediction_value"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.loc[[661]]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_text = test_texts[5]\n",
+    "print(test_text)\n",
+    "predict_input = tokenizer_fine_tuned.encode(\n",
+    "    test_text,\n",
+    "    truncation = True,\n",
+    "    padding = True,\n",
+    "    return_tensors = 'tf'    \n",
+    ")\n",
+    "\n",
+    "output = model_fine_tuned(predict_input)[0]\n",
+    "\n",
+    "prediction_value = tf.argmax(output, axis = 1).numpy()[0]\n",
+    "\n",
+    "print(prediction_value)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_labels[5]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.loc[[553]]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "predictions = TFTrainer.predict(val_dataset)\n",
+    "print(predictions.predictions.shape, predictions.label_ids.shape)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "TFTrainer.evaluate( )#eval_dataset=val_dataset)#encoded_dataset[“test”])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "next(iter(train_dataset))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# inference with torch\n",
+    "import torch\n",
+    "\n",
+    "from transformers import DistilBertForSequenceClassification\n",
+    "\n",
+    "tokenizer_fine_tuned_pt = DistilBertTokenizer.from_pretrained(save_directory)\n",
+    "model_fine_tuned_pt = DistilBertForSequenceClassification.from_pretrained(save_directory, from_tf = True )\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "predict_input_pt = tokenizer_fine_tuned_pt(test_text, truncation = True, padding = True, return_tensors = 'pt' )\n",
+    "\n",
+    "ouput_pt = model_fine_tuned_pt(predict_input_pt)\n",
+    "\n",
+    "prediction_value_pt = torch.argmax(ouput_pt[0], dim = 1 ).item()\n",
+    "\n",
+    "prediction_value_pt"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### nephropathy binary classification experiment"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# drop labels non usate\n",
+    "df.drop(df[df['label_iga_nephropathy'] == \"No_info\"].index, inplace = True)\n",
+    "\n",
+    "# label encoding\n",
+    "df['label_iga_nephropathy'].unique()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(df.shape)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df['encoded_nephro'] = df['label_iga_nephropathy'].astype('category').cat.codes\n",
+    "df.head(10)\n",
+    "\n",
+    "data_texts = df['text'].to_list()\n",
+    "data_labels = df['encoded_nephro'].to_list()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.drop(['label_diabetes', 'label_hypertension'], axis=1)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ds splits\n",
+    "train_texts, val_texts, train_labels, val_labels = train_test_split(data_texts, data_labels, test_size = 0.2, random_state = 0 )\n",
+    "train_texts, test_texts, train_labels, test_labels = train_test_split(train_texts, train_labels, test_size = 0.01, random_state = 0 )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data_texts"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "train_texts"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "np.shape(data_texts)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Model selection\n",
+    "\n",
+    "model_name = 'distilbert-base-cased'  \n",
+    "\n",
+    "tokenizer = DistilBertTokenizer.from_pretrained(model_name)\n",
+    "\n",
+    "\n",
+    "train_encodings = tokenizer(train_texts, truncation = True, padding = True  )\n",
+    "val_encodings = tokenizer(val_texts, truncation = True, padding = True )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "train_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(train_encodings),\n",
+    "    train_labels\n",
+    "))\n",
+    "\n",
+    "val_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(val_encodings),\n",
+    "    val_labels\n",
+    "))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# model definition\n",
+    "model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-cased', num_labels=2)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from transformers import TFDistilBertForSequenceClassification, TFTrainer, TFTrainingArguments\n",
+    "\n",
+    "\n",
+    "training_args = TFTrainingArguments(\n",
+    "    output_dir=r'FOLDER',         \n",
+    "    num_train_epochs=7,              \n",
+    "    per_device_train_batch_size=8,  \n",
+    "    per_device_eval_batch_size=32,   \n",
+    "    warmup_steps=500,                \n",
+    "    weight_decay=1e-5,               \n",
+    "    logging_dir=r'FOLDER', #'./logs',            \n",
+    "    eval_steps=100,\n",
+    "    metric_for_best_model='eval_Loss',\n",
+    "    \n",
+    "    evaluation_strategy=\"epoch\",\n",
+    "    save_strategy=\"epoch\",\n",
+    "    save_total_limit=1,\n",
+    "\n",
+    "    #optim=\"adamw_torch\",\n",
+    "    #learning_rate=5e-5,\n",
+    "    load_best_model_at_end=True,\n",
+    "    #greater_is_better=False,\n",
+    "    disable_tqdm=False                  \n",
+    ")\n",
+    "\n",
+    "with training_args.strategy.scope():\n",
+    "    trainer_model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-cased', num_labels = 2 )\n",
+    "\n",
+    "trainer = TFTrainer(\n",
+    "    model=trainer_model,                 \n",
+    "    args=training_args,                  \n",
+    "    train_dataset=train_dataset,         \n",
+    "    eval_dataset=val_dataset,            \n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_encodings = tokenizer(test_texts, truncation = True, padding = True )\n",
+    "\n",
+    "test_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(test_encodings),\n",
+    "    test_labels\n",
+    "))\n",
+    "\n",
+    "trainer.predict(val_dataset)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trainer.evaluate(test_dataset)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 105,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "output=trainer.predict(test_dataset)[1]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "output"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_labels"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "\n",
+    "from sklearn.metrics import confusion_matrix\n",
+    "\n",
+    "cm=confusion_matrix(test_labels,output)\n",
+    "cm"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "optimizer = optimizers.Adam(learning_rate=3e-5)\n",
+    "loss = losses.SparseCategoricalCrossentropy(from_logits=True)\n",
+    "model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])\n",
+    "\n",
+    "model.fit(tfdataset_train, batch_size=BATCH_SIZE, epochs=N_EPOCHS)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "benchmarks = model.evaluate(tfdataset_test, return_dict=True, batch_size=BATCH_SIZE)\n",
+    "print(benchmarks)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(model.summary())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "for layer in model.layers:\n",
+    "    print(layer.get_output_at(0).get_shape().as_list())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### diabetes cls"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# drop labels non usate\n",
+    "df.drop(df[df['label_diabetes'] == \"No_info\"].index, inplace = True)\n",
+    "# label encoding\n",
+    "print(df['label_diabetes'].unique())\n",
+    "print(df.shape)\n",
+    "df['encoded_diabetes'] = df['label_diabetes'].astype('category').cat.codes\n",
+    "\n",
+    "# data_texts format adjustment\n",
+    "data_texts = df['text'].to_list()\n",
+    "data_texts_ = pd.DataFrame(data_texts)\n",
+    "data_texts = data_texts_[0].to_list()\n",
+    "\n",
+    "data_labels = df['encoded_diabetes'].to_list()\n",
+    "\n",
+    "print(df.head(10))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data_texts[0][0]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ds splits 70 20 10\n",
+    "train_texts, val_texts, train_labels, val_labels = train_test_split(data_texts, data_labels, test_size = 0.2, random_state = 0 )\n",
+    "train_texts, test_texts, train_labels, test_labels = train_test_split(train_texts, train_labels, test_size = 0.1, random_state = 0 )\n",
+    "print(np.shape(data_texts), np.shape(train_texts),np.shape(val_texts), np.shape(test_texts))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Model selection\n",
+    "model_name = 'distilbert-base-cased'  \n",
+    "\n",
+    "tokenizer = DistilBertTokenizer.from_pretrained(model_name)\n",
+    "\n",
+    "train_encodings = tokenizer(train_texts, truncation = True, padding = True  )\n",
+    "val_encodings = tokenizer(val_texts, truncation = True, padding = True )\n",
+    "test_encodings = tokenizer(test_texts, truncation = True, padding = True )\n",
+    "\n",
+    "train_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(train_encodings),\n",
+    "    train_labels\n",
+    "))\n",
+    "\n",
+    "val_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(val_encodings),\n",
+    "    val_labels\n",
+    "))\n",
+    "\n",
+    "test_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(test_encodings),\n",
+    "    test_labels\n",
+    "))\n",
+    "\n",
+    "from transformers import TFDistilBertForSequenceClassification, TFTrainer, TFTrainingArguments\n",
+    "\n",
+    "\n",
+    "training_args = TFTrainingArguments(\n",
+    "    output_dir=r'FOLDER',    \n",
+    "    num_train_epochs=7,              \n",
+    "    per_device_train_batch_size=8,  \n",
+    "    per_device_eval_batch_size=32,   \n",
+    "    warmup_steps=500,                \n",
+    "    weight_decay=1e-5,               \n",
+    "    logging_dir=r'FOLDER',         \n",
+    "    eval_steps=100,\n",
+    "    metric_for_best_model='eval_Loss',\n",
+    "    \n",
+    "    evaluation_strategy=\"epoch\",\n",
+    "    save_strategy=\"epoch\",\n",
+    "    save_total_limit=1,\n",
+    "\n",
+    "    #optim=\"adamw_torch\",\n",
+    "    #learning_rate=5e-5,\n",
+    "    load_best_model_at_end=True,\n",
+    "    #greater_is_better=False,\n",
+    "    disable_tqdm=False                  \n",
+    ")\n",
+    "\n",
+    "with training_args.strategy.scope():\n",
+    "    trainer_model = TFDistilBertForSequenceClassification.from_pretrained(model_name, num_labels = 2 )\n",
+    "\n",
+    "trainer = TFTrainer(\n",
+    "    model=trainer_model,                 \n",
+    "    args=training_args,                  \n",
+    "    train_dataset=train_dataset,         \n",
+    "    eval_dataset=val_dataset,            \n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# compute metrics\n",
+    "output=trainer.predict(test_dataset)[1]\n",
+    "\n",
+    "def compute_metrics(pred):\n",
+    "\n",
+    "    # Compute macro precision, recall, and F1 score using sklearn's precision_recall_fscore_support function\n",
+    "    precision, recall, f1, _ = precision_recall_fscore_support(test_labels, pred, average='macro')\n",
+    "    # Calculate the accuracy score using sklearn's accuracy_score function\n",
+    "    acc = accuracy_score(test_labels, pred)\n",
+    "\n",
+    "    print(precision, recall, f1, acc)\n",
+    "\n",
+    "    # get confusion matrix\n",
+    "    cm=confusion_matrix(test_labels,pred)\n",
+    "    print(cm)\n",
+    "    \n",
+    "compute_metrics(output)   "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# save trainer model for inference\n",
+    "save_directory = r\"FOLDER\" \n",
+    "trainer.save_model(save_directory)\n",
+    "tokenizer.save_pretrained(save_directory)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "output=trainer_model.predict(test_dataset)\n",
+    "\n",
+    "probs = output[0].argmax(-1)\n",
+    "\n",
+    "precision, recall, f1, _ = precision_recall_fscore_support(test_labels, probs, average='macro')\n",
+    "acc = accuracy_score(test_labels, probs)\n",
+    "\n",
+    "print(precision, recall, f1, acc)\n",
+    "\n",
+    "cm=confusion_matrix(test_labels,probs)\n",
+    "print(cm)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load model for inference\n",
+    "tokenizer_fine_tuned = DistilBertTokenizer.from_pretrained(save_directory)\n",
+    "model_fine_tuned = TFDistilBertForSequenceClassification.from_pretrained(save_directory)\n",
+    "\n",
+    "# Esegui la previsione\n",
+    "logits = model_fine_tuned.predict(test_dataset)[0]\n",
+    "# Applica softmax alle previsioni\n",
+    "probabilities = tf.nn.softmax(logits, axis=-1)\n",
+    "\n",
+    "labels = np.argmax(probabilities, axis=1)\n",
+    "precision, recall, f1, _ = precision_recall_fscore_support(test_labels, labels, average='macro')\n",
+    "acc = accuracy_score(test_labels, labels)\n",
+    "\n",
+    "print(\"precision = \", precision, \" recall =\", recall,\" f1 =\", f1 , \" acc =\" , acc)\n",
+    "\n",
+    "cm=confusion_matrix(test_labels, labels)\n",
+    "print(cm)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### HYPERTENSION cls"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# drop labels non usate\n",
+    "df.drop(df[df['label_hypertension'] == \"No_info\"].index, inplace = True)\n",
+    "# label encoding\n",
+    "print(df['label_hypertension'].unique())\n",
+    "print(df.shape)\n",
+    "labels = df['label_hypertension'].unique().tolist()\n",
+    "labels = [s.strip() for s in labels ]\n",
+    "NUM_LABELS= len(labels)\n",
+    "id2label={id:label for id,label in enumerate(labels)}\n",
+    "label2id={label:id for id,label in enumerate(labels)}\n",
+    "df['encoded_hypretension']=df.label_hypertension.map(lambda x: label2id[x.strip()])\n",
+    "print(labels, id2label, label2id)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# data_texts format adjustment\n",
+    "data_texts = df['text'].to_list()\n",
+    "data_texts_ = pd.DataFrame(data_texts)\n",
+    "data_texts = data_texts_[0].to_list()\n",
+    "\n",
+    "data_labels = df['encoded_hypretension'].to_list()\n",
+    "\n",
+    "# Model selection\n",
+    "model_name = 'distilbert-base-cased'  \n",
+    "\n",
+    "tokenizer = DistilBertTokenizer.from_pretrained(model_name)\n",
+    "\n",
+    "# ds splits 70 20 10\n",
+    "train_texts, val_texts, train_labels, val_labels = train_test_split(data_texts, data_labels, test_size = 0.2, random_state = 0 )\n",
+    "train_texts, test_texts, train_labels, test_labels = train_test_split(train_texts, train_labels, test_size = 0.1, random_state = 0 )\n",
+    "print(np.shape(data_texts), np.shape(train_texts),np.shape(val_texts), np.shape(test_texts))\n",
+    "\n",
+    "train_encodings = tokenizer(train_texts, truncation = True, padding = True  )\n",
+    "val_encodings = tokenizer(val_texts, truncation = True, padding = True )\n",
+    "test_encodings = tokenizer(test_texts, truncation = True, padding = True )\n",
+    "\n",
+    "train_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(train_encodings),\n",
+    "    train_labels\n",
+    "))\n",
+    "\n",
+    "val_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(val_encodings),\n",
+    "    val_labels\n",
+    "))\n",
+    "\n",
+    "test_dataset = tf.data.Dataset.from_tensor_slices((\n",
+    "    dict(test_encodings),\n",
+    "    test_labels\n",
+    "))\n",
+    "\n",
+    "from transformers import TFDistilBertForSequenceClassification, TFTrainer, TFTrainingArguments\n",
+    "\n",
+    "training_args = TFTrainingArguments(\n",
+    "    output_dir=r'FOLDER',         \n",
+    "    num_train_epochs=10,              \n",
+    "    per_device_train_batch_size=8,  \n",
+    "    per_device_eval_batch_size=32,\n",
+    "    # Number of steps used for a linear warmup   \n",
+    "    #warmup_steps=500,                \n",
+    "    weight_decay=1e-5,               \n",
+    "    logging_dir=r'FOLDER',       \n",
+    "    \n",
+    "    #evaluation_strategy=\"epoch\", \n",
+    "    evaluation_strategy=\"steps\",    \n",
+    "    eval_steps=100,\n",
+    "    metric_for_best_model='eval_Loss',\n",
+    "    \n",
+    "    #save_strategy=\"epoch\",\n",
+    "    save_strategy=\"steps\",\n",
+    "    save_steps=500, \n",
+    "    #save_total_limit=1,\n",
+    "\n",
+    "    #optim=\"adamw_torch\",\n",
+    "    #learning_rate=5e-5,\n",
+    "    load_best_model_at_end=True,\n",
+    "    greater_is_better=False,\n",
+    "    disable_tqdm=False,\n",
+    "    \n",
+    "    do_train=True,\n",
+    "    do_eval=True,   \n",
+    "    #logging_strategy='epoch'\n",
+    "    logging_strategy='steps',\n",
+    "    logging_steps=500, \n",
+    "    \n",
+    "    report_to=\"tensorboard\"\n",
+    ")\n",
+    "         \n",
+    "\n",
+    "with training_args.strategy.scope():\n",
+    "    trainer_model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-cased', num_labels = NUM_LABELS, id2label=id2label, label2id=label2id)\n",
+    "\n",
+    "trainer = TFTrainer(\n",
+    "    model=trainer_model,                 \n",
+    "    args=training_args,                  \n",
+    "    train_dataset=train_dataset,         \n",
+    "    eval_dataset=val_dataset,            \n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%time\n",
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# compute metrics\n",
+    "output=trainer.predict(test_dataset)[1]\n",
+    "\n",
+    "def compute_metrics(pred):\n",
+    "\n",
+    "    # Compute macro precision, recall, and F1 score using sklearn's precision_recall_fscore_support function\n",
+    "    precision, recall, f1, _ = precision_recall_fscore_support(test_labels, pred, average='macro')\n",
+    "    # Calculate the accuracy score using sklearn's accuracy_score function\n",
+    "    acc = accuracy_score(test_labels, pred)\n",
+    "\n",
+    "    print(precision, recall, f1, acc)\n",
+    "\n",
+    "    # get confusion matrix\n",
+    "    cm=confusion_matrix(test_labels,pred)\n",
+    "    print(cm)\n",
+    "    \n",
+    "compute_metrics(output)   "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "output=trainer_model.predict(test_dataset)\n",
+    "\n",
+    "probs = output[0].argmax(-1)\n",
+    "\n",
+    "precision, recall, f1, _ = precision_recall_fscore_support(test_labels, probs, average='macro')\n",
+    "acc = accuracy_score(test_labels, probs)\n",
+    "\n",
+    "print(precision, recall, f1, acc)\n",
+    "\n",
+    "cm=confusion_matrix(test_labels,probs)\n",
+    "print(cm)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# save trainer model for inference\n",
+    "save_directory = r\"FOLDER\" \n",
+    "trainer.save_model(save_directory)\n",
+    "tokenizer.save_pretrained(save_directory)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load model for inference\n",
+    "tokenizer_fine_tuned = DistilBertTokenizer.from_pretrained(save_directory)\n",
+    "model_fine_tuned = TFDistilBertForSequenceClassification.from_pretrained(save_directory)\n",
+    "\n",
+    "# Esegui la previsione\n",
+    "logits = model_fine_tuned.predict(test_dataset)[0]\n",
+    "# Applica softmax alle previsioni\n",
+    "probabilities = tf.nn.softmax(logits, axis=-1)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "labels = np.argmax(probabilities, axis=1)\n",
+    "precision, recall, f1, _ = precision_recall_fscore_support(test_labels, labels, average='macro')\n",
+    "acc = accuracy_score(test_labels, labels)\n",
+    "\n",
+    "print(\"precision = \", precision, \" recall =\", recall,\" f1 =\", f1 , \" acc =\" , acc)\n",
+    "\n",
+    "cm=confusion_matrix(test_labels, labels)\n",
+    "print(cm)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pred_label = model_fine_tuned.config.id2label[labels[0]]\n",
+    "pred_label"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%load_ext tensorboard"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%tensorboard --logdir runs"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%tensorboard --logdir r\"FOLDER\""
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "clarify",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.16"
+  },
+  "orig_nbformat": 4
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
